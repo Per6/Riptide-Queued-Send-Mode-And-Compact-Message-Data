@@ -10,7 +10,7 @@ using System.Net;
 namespace Riptide.Transports.Udp
 {
     /// <summary>A server which can accept connections from <see cref="UdpClient"/>s.</summary>
-    public class UdpServer : UdpPeer, IServer
+    public class UdpServer : UdpPeer, IServer<ushort>
     {
         /// <inheritdoc/>
         public event EventHandler<ConnectedEventArgs> Connected;

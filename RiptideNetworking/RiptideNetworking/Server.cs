@@ -27,7 +27,9 @@ namespace Riptide
         /// <summary>Whether or not the server is currently running.</summary>
         public bool IsRunning { get; private set; }
         /// <summary>The local port that the server is running on.</summary>
-        public ushort Port => transport.Port;
+        public ushort? Port => transport.t1.Port;
+		/// <summary>The local guid that the server is running on.</summary>
+		public Guid? Guid => transport.t2.Port;
         /// <summary>Sets the default timeout time for future connections and updates the <see cref="Connection.TimeoutTime"/> of all connected clients.</summary>
         public override int TimeoutTime
         {
@@ -76,14 +78,22 @@ namespace Riptide
         /// <summary>Methods used to handle messages, accessible by their corresponding message IDs.</summary>
         private Dictionary<ushort, MessageHandler> messageHandlers;
         /// <summary>The underlying transport's server that is used for sending and receiving data.</summary>
-        private IServer transport;
+        private Either<IServer<ushort>, IServer<Guid>> transport;
         /// <summary>All currently unused client IDs.</summary>
         private Queue<ushort> availableClientIds;
 
-        /// <summary>Handles initial setup.</summary>
+		/// <summary>Handles initial setup.</summary>
         /// <param name="transport">The transport to use for sending and receiving data.</param>
         /// <param name="logName">The name to use when logging messages via <see cref="RiptideLogger"/>.</param>
-        public Server(IServer transport, string logName = "SERVER") : base(logName)
+		public Server(IServer<ushort> transport, string logName = "SERVER")
+			: this(new Either<IServer<ushort>, IServer<Guid>>(transport), logName, true) { }
+		/// <summary>Handles initial setup.</summary>
+        /// <param name="transport">The transport to use for sending and receiving data.</param>
+        /// <param name="logName">The name to use when logging messages via <see cref="RiptideLogger"/>.</param>
+		public Server(IServer<Guid> transport, string logName = "SERVER")
+			: this(new Either<IServer<ushort>, IServer<Guid>>(transport), logName, false) { }
+
+        private Server(Either<IServer<ushort>, IServer<Guid>> transport, string logName, bool _) : base(logName)
         {
             this.transport = transport;
             pendingConnections = new List<Connection>();
@@ -97,19 +107,44 @@ namespace Riptide
         /// <summary>Stops the server if it's running and swaps out the transport it's using.</summary>
         /// <param name="newTransport">The new underlying transport server to use for sending and receiving data.</param>
         /// <remarks>This method does not automatically restart the server. To continue accepting connections, <see cref="Start(ushort, ushort, byte, bool)"/> must be called again.</remarks>
-        public void ChangeTransport(IServer newTransport)
-        {
+        public void ChangeTransport(IServer<ushort> newTransport) {
             Stop();
-            transport = newTransport;
+            transport = new Either<IServer<ushort>, IServer<Guid>>(newTransport);
         }
 
-        /// <summary>Starts the server.</summary>
+        /// <summary>Stops the server if it's running and swaps out the transport it's using.</summary>
+        /// <param name="newTransport">The new underlying transport server to use for sending and receiving data.</param>
+        /// <remarks>This method does not automatically restart the server. To continue accepting connections, <see cref="Start(ushort, ushort, byte, bool)"/> must be called again.</remarks>
+        public void ChangeTransport(IServer<Guid> newTransport) {
+            Stop();
+            transport = new Either<IServer<ushort>, IServer<Guid>>(newTransport);
+        }
+
+		/// <summary>Starts the server.</summary>
         /// <param name="port">The local port on which to start the server.</param>
         /// <param name="maxClientCount">The maximum number of concurrent connections to allow.</param>
         /// <param name="messageHandlerGroupId">The ID of the group of message handler methods to use when building <see cref="messageHandlers"/>.</param>
         /// <param name="useMessageHandlers">Whether or not the server should use the built-in message handler system.</param>
         /// <remarks>Setting <paramref name="useMessageHandlers"/> to <see langword="false"/> will disable the automatic detection and execution of methods with the <see cref="MessageHandlerAttribute"/>, which is beneficial if you prefer to handle messages via the <see cref="MessageReceived"/> event.</remarks>
         public void Start(ushort port, ushort maxClientCount, byte messageHandlerGroupId = 0, bool useMessageHandlers = true)
+        {
+			if(transport.t1 is null) throw new Exception("Server transport is bluetooth.");
+			Start(() => transport.t1.Start(port), maxClientCount, messageHandlerGroupId, useMessageHandlers, $"port {port}");
+		}
+
+		/// <summary>Starts the server.</summary>
+        /// <param name="serviceGuid">The local serviceGuid on which to start the server.</param>
+        /// <param name="maxClientCount">The maximum number of concurrent connections to allow.</param>
+        /// <param name="messageHandlerGroupId">The ID of the group of message handler methods to use when building <see cref="messageHandlers"/>.</param>
+        /// <param name="useMessageHandlers">Whether or not the server should use the built-in message handler system.</param>
+        /// <remarks>Setting <paramref name="useMessageHandlers"/> to <see langword="false"/> will disable the automatic detection and execution of methods with the <see cref="MessageHandlerAttribute"/>, which is beneficial if you prefer to handle messages via the <see cref="MessageReceived"/> event.</remarks>
+        public void Start(Guid serviceGuid, ushort maxClientCount, byte messageHandlerGroupId = 0, bool useMessageHandlers = true)
+        {
+			if(transport.t2 is null) throw new Exception("Server transport is not udp or tcp.");
+			Start(() => transport.t2.Start(serviceGuid), maxClientCount, messageHandlerGroupId, useMessageHandlers, serviceGuid.ToString());
+		}
+
+        private void Start(Action transportStart, ushort maxClientCount, byte messageHandlerGroupId, bool useMessageHandlers, string port)
         {
             Stop();
 
@@ -123,29 +158,37 @@ namespace Riptide
             InitializeClientIds();
 
             SubToTransportEvents();
-            transport.Start(port);
+			transportStart();
 
             StartTime();
             Heartbeat();
             IsRunning = true;
-            RiptideLogger.Log(LogType.Info, LogName, $"Started on port {port}.");
+            RiptideLogger.Log(LogType.Info, LogName, $"Started on {port}.");
         }
 
         /// <summary>Subscribes appropriate methods to the transport's events.</summary>
-        private void SubToTransportEvents()
-        {
-            transport.Connected += HandleConnectionAttempt;
-            transport.DataReceived += HandleData;
-            transport.Disconnected += TransportDisconnected;
+        private void SubToTransportEvents() {
+			if(transport.t1 != null) SubscribeToTransportEvents(transport.t1);
+			else if(transport.t2 != null) SubscribeToTransportEvents(transport.t2);
         }
 
+		private void SubscribeToTransportEvents<T>(IServer<T> transport) {
+			transport.Connected += HandleConnectionAttempt;
+			transport.DataReceived += HandleData;
+			transport.Disconnected += TransportDisconnected;
+		}
+
         /// <summary>Unsubscribes methods from all of the transport's events.</summary>
-        private void UnsubFromTransportEvents()
-        {
-            transport.Connected -= HandleConnectionAttempt;
-            transport.DataReceived -= HandleData;
-            transport.Disconnected -= TransportDisconnected;
+        private void UnsubFromTransportEvents() {
+			if(transport.t1 != null) UnsubscribeFromTransportEvents(transport.t1);
+			else if(transport.t2 != null) UnsubscribeFromTransportEvents(transport.t2);
         }
+
+		private void UnsubscribeFromTransportEvents<T>(IServer<T> transport) {
+			transport.Connected -= HandleConnectionAttempt;
+			transport.DataReceived -= HandleData;
+			transport.Disconnected -= TransportDisconnected;
+		}
 
         /// <inheritdoc/>
         protected override void CreateMessageHandlersDictionary(byte messageHandlerGroupId)
@@ -306,7 +349,8 @@ namespace Riptide
         public override void Update()
         {
             base.Update();
-            transport.Poll();
+			transport.t1?.Poll();
+			transport.t2?.Poll();
             HandleMessages();
         }
 
@@ -428,7 +472,8 @@ namespace Riptide
             if (client.Peer != this)
                 return; // Client does not belong to this Server instance
 
-            transport.Close(client);
+            transport.t1?.Close(client);
+			transport.t2?.Close(client);
 
             if (clients.Remove(client.Id))
                 availableClientIds.Enqueue(client.Id);
@@ -457,7 +502,8 @@ namespace Riptide
             SendToAll(Message.Create(MessageHeader.Disconnect).AddByte((byte)DisconnectReason.ServerStopped));
             clients.Clear();
 
-            transport.Shutdown();
+            transport.t1?.Shutdown();
+			transport.t2?.Shutdown();
             UnsubFromTransportEvents();
 
             DecreaseActiveCount();

@@ -11,7 +11,7 @@ using System.Net.Sockets;
 namespace Riptide.Transports.Tcp
 {
     /// <summary>A server which can accept connections from <see cref="TcpClient"/>s.</summary>
-    public class TcpServer : TcpPeer, IServer
+    public class TcpServer : TcpPeer, IServer<ushort>
     {
         /// <inheritdoc/>
         public event EventHandler<ConnectedEventArgs> Connected;

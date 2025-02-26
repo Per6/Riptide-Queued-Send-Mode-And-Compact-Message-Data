@@ -53,6 +53,10 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="InTheHand.Net.Bluetooth" Version="4.1.44" />
+  </ItemGroup>
+
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
     <Copy Condition="'$(SolutionName)'=='RiptideNetworking'" SourceFiles="@(UPMSourceFiles)" DestinationFiles="@(UPMSourceFiles->'$(SolutionDir)..\Packages\Core\Runtime\Core\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
   </Target>
