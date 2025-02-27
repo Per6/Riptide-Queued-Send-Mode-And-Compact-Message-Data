@@ -12,5 +12,5 @@ file_header_template = This file is provided under The MIT License as part of Ri
 dotnet_diagnostic.IDE0073.severity = warning
 
 # Math.cs or FastBigInt.cs or WrappingList.cs or PendingQueuedMessage.cs
-[*[CigQ][MgLut][aIieh][tnsue][hter]*.cs]
+[*[CigQB][MgLutl][aIiehu][tnsue][hter]*.cs]
 file_header_template = This file is provided under The MIT License as part of RiptideNetworking.\nCopyright (c) not Tom Weiland but me https://github.com/Per6\nFor additional information please see the included LICENSE.md file or view it on GitHub:\nhttps://github.com/RiptideNetworking/Riptide/blob/main/LICENSE.md

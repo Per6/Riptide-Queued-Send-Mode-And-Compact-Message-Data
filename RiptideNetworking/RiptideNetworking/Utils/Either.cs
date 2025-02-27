@@ -25,6 +25,15 @@ internal class Either<T1, T2> where T1 : class where T2 : class
 		IsT1 = false;
 	}
 
+	internal void Match(Action<T1> action1, Action<T2> action2) {
+		if(IsT1) action1(t1);
+		else action2(t2);
+	}
+
+	internal TResult Match<TResult>(Func<T1, TResult> func1, Func<T2, TResult> func2) {
+		return IsT1 ? func1(t1) : func2(t2);
+	}
+
 	/// <summary>Converts an instance of <typeparamref name="T1"/> to <see cref="Either{T1, T2}"/>.</summary>
 	public static implicit operator Either<T1, T2>(T1 item1) => new Either<T1, T2>(item1);
 	/// <summary>Converts an instance of <typeparamref name="T1"/> to <see cref="Either{T1, T2}"/>.</summary>

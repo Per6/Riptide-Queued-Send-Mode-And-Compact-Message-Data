@@ -1,12 +1,11 @@
 // This file is provided under The MIT License as part of RiptideNetworking.
-// Copyright (c) Tom Weiland
+// Copyright (c) not Tom Weiland but me https://github.com/Per6
 // For additional information please see the included LICENSE.md file or view it on GitHub:
 // https://github.com/RiptideNetworking/Riptide/blob/main/LICENSE.md
 
+using InTheHand.Net;
 using System;
 using System.Collections.Generic;
-using InTheHand.Net;
-using InTheHand.Net.Sockets;
 
 namespace Riptide.Transports.Bluetooth
 {
@@ -19,43 +18,51 @@ namespace Riptide.Transports.Bluetooth
         public event EventHandler<DataReceivedEventArgs> DataReceived;
 
         /// <summary>The currently open connections, accessible by their endpoints.</summary>
-        private Dictionary<BluetoothEndPoint, BluetoothConnection> connections;
+        private HashSet<BluetoothConnection> connections;
 
 		/// <inheritdoc/>
         public Guid Port { get; private set; }
 
+		private BluetoothAddress bluetoothAddress;
+
         /// <inheritdoc/>
-        public BluetoothServer(int socketBufferSize = DefaultSocketBufferSize) : base(socketBufferSize)
+        public BluetoothServer(BluetoothAddress bluetoothAddress, int socketBufferSize = DefaultSocketBufferSize) : base(socketBufferSize)
         {
-            connections = new Dictionary<BluetoothEndPoint, BluetoothConnection>();
+            connections = new HashSet<BluetoothConnection>();
+			this.bluetoothAddress = bluetoothAddress;
         }
 
         /// <inheritdoc/>
         public void Start(Guid serviceGuid)
         {
 			Port = serviceGuid;
-            OpenConnection(null, serviceGuid);
+            // OpenConnection(bluetoothAddress, serviceGuid);
         }
 
         /// <summary>Decides what to do with a connection attempt.</summary>
-        /// <param name="fromEndPoint">The endpoint the connection attempt is coming from.</param>
+        /// <param name="fromConnection">The endpoint the connection attempt is coming from.</param>
         /// <returns>Whether or not the connection attempt was from a new connection.</returns>
-        private bool HandleConnectionAttempt(BluetoothEndPoint fromEndPoint)
+        private bool HandleConnectionAttempt(BluetoothConnection fromConnection)
         {
-            if (connections.ContainsKey(fromEndPoint))
+            if (connections.Contains(fromConnection))
                 return false;
 
-            BluetoothConnection connection = new BluetoothConnection(fromEndPoint, this);
-            connections.Add(fromEndPoint, connection);
-            OnConnected(connection);
+            connections.Add(fromConnection);
+            OnConnected(fromConnection);
             return true;
         }
+
+		/// <inheritdoc/>
+		public void Poll() {
+			foreach (BluetoothConnection connection in connections)
+				connection.Poll();
+		}
 
         /// <inheritdoc/>
         public void Close(Connection connection)
         {
             if (connection is BluetoothConnection bluetoothConnection)
-                connections.Remove(bluetoothConnection.RemoteEndPoint);
+                connections.Remove(bluetoothConnection);
         }
 
         /// <inheritdoc/>
@@ -73,13 +80,13 @@ namespace Riptide.Transports.Bluetooth
         }
 
         /// <inheritdoc/>
-        protected override void OnDataReceived(byte[] dataBuffer, int amount)
-        {
-            foreach (var connection in connections.Values)
-            {
-                if (!connection.IsNotConnected)
-                    DataReceived?.Invoke(this, new DataReceivedEventArgs(dataBuffer, amount, connection));
-            }
-        }
+        protected internal override void OnDataReceived(byte[] dataBuffer, int amount, BluetoothConnection fromConnection)
+		{
+			if ((MessageHeader)(dataBuffer[0] & Message.HeaderBitmask) == MessageHeader.Connect && !HandleConnectionAttempt(fromConnection))
+                return;
+
+			if (!fromConnection.IsNotConnected)
+				DataReceived?.Invoke(this, new DataReceivedEventArgs(dataBuffer, amount, fromConnection));
+		}
     }
 }

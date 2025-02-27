@@ -1,5 +1,5 @@
 // This file is provided under The MIT License as part of RiptideNetworking.
-// Copyright (c) Tom Weiland
+// Copyright (c) not Tom Weiland but me https://github.com/Per6
 // For additional information please see the included LICENSE.md file or view it on GitHub:
 // https://github.com/RiptideNetworking/Riptide/blob/main/LICENSE.md
 
@@ -7,7 +7,7 @@ using System;
 using System.Linq;
 using System.Net.Sockets;
 using InTheHand.Net;
-using InTheHand.Net.Sockets;
+using Riptide.Utils;
 
 namespace Riptide.Transports.Bluetooth
 {
@@ -40,8 +40,7 @@ namespace Riptide.Transports.Bluetooth
 
             try
             {
-                OpenConnection(bluetoothAddress, serviceGuid);
-                connection = bluetoothConnection = new BluetoothConnection(new BluetoothEndPoint(bluetoothAddress, serviceGuid), this);
+                connection = bluetoothConnection = OpenConnection(bluetoothAddress, serviceGuid);
                 OnConnected(); // Bluetooth is connection-oriented, so the connection is established immediately
                 return true;
             }
@@ -53,6 +52,12 @@ namespace Riptide.Transports.Bluetooth
                 return false;
             }
         }
+
+		/// <inheritdoc/>
+		public void Poll() {
+			if (bluetoothConnection != null && !bluetoothConnection.IsNotConnected)
+				bluetoothConnection.Poll();
+		}
 
         /// <summary>Parses <paramref name="hostAddress"/> into <paramref name="bluetoothAddress"/> and <paramref name="serviceGuid"/>, if possible.</summary>
         /// <param name="hostAddress">The host address to parse.</param>
@@ -72,8 +77,14 @@ namespace Riptide.Transports.Bluetooth
             string bluetoothAddressString = string.Join(":", addressAndGuid.Take(6));
             string serviceGuidString = addressAndGuid[6];
 
-            return BluetoothAddress.TryParse(bluetoothAddressString, out bluetoothAddress)
-				& Guid.TryParse(serviceGuidString, out serviceGuid);
+			RiptideLogger.Log(LogType.Info, $"Bluetooth address: {bluetoothAddressString}, service GUID: {serviceGuidString}");
+			if(!BluetoothAddress.TryParse(bluetoothAddressString, out bluetoothAddress))
+				return false;
+			RiptideLogger.Log(LogType.Info, $"Bluetooth address: {bluetoothAddress}");
+			if(!Guid.TryParse(serviceGuidString, out serviceGuid))
+				return false;
+			RiptideLogger.Log(LogType.Info, $"Bluetooth address: {bluetoothAddress}, service GUID: {serviceGuid}");
+			return true;
         }
 
         /// <inheritdoc/>
@@ -95,10 +106,10 @@ namespace Riptide.Transports.Bluetooth
         }
 
         /// <inheritdoc/>
-        protected override void OnDataReceived(byte[] dataBuffer, int amount)
+        protected internal override void OnDataReceived(byte[] dataBuffer, int amount, BluetoothConnection fromConnection)
         {
             if (bluetoothConnection != null && !bluetoothConnection.IsNotConnected)
-                DataReceived?.Invoke(this, new DataReceivedEventArgs(dataBuffer, amount, bluetoothConnection));
+                DataReceived?.Invoke(this, new DataReceivedEventArgs(dataBuffer, amount, fromConnection));
         }
     }
 }

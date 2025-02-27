@@ -1,12 +1,12 @@
 // This file is provided under The MIT License as part of RiptideNetworking.
-// Copyright (c) Tom Weiland
+// Copyright (c) not Tom Weiland but me https://github.com/Per6
 // For additional information please see the included LICENSE.md file or view it on GitHub:
 // https://github.com/RiptideNetworking/Riptide/blob/main/LICENSE.md
 
-using Riptide.Utils;
 using System;
 using System.Collections.Generic;
-using InTheHand.Net.Sockets;
+using System.IO;
+using System.Net.Sockets;
 using InTheHand.Net;
 
 namespace Riptide.Transports.Bluetooth
@@ -17,22 +17,97 @@ namespace Riptide.Transports.Bluetooth
         /// <summary>The endpoint representing the other end of the connection.</summary>
         public readonly BluetoothEndPoint RemoteEndPoint;
 
+        /// <summary>The Bluetooth client to use for sending and receiving.</summary>
+        private readonly InTheHand.Net.Sockets.BluetoothClient client;
+        /// <summary>The stream used for sending and receiving data.</summary>
+        private readonly NetworkStream stream;
         /// <summary>The local peer this connection is associated with.</summary>
         private readonly BluetoothPeer peer;
+        /// <summary>An array to receive message size values into.</summary>
+        private readonly byte[] sizeBytes = new byte[sizeof(int)];
+        /// <summary>The size of the next message to be received.</summary>
+        private int nextMessageSize;
 
         /// <summary>Initializes the connection.</summary>
+        /// <param name="client">The Bluetooth client to use for sending and receiving.</param>
         /// <param name="remoteEndPoint">The endpoint representing the other end of the connection.</param>
         /// <param name="peer">The local peer this connection is associated with.</param>
-        internal BluetoothConnection(BluetoothEndPoint remoteEndPoint, BluetoothPeer peer)
+        internal BluetoothConnection(InTheHand.Net.Sockets.BluetoothClient client, BluetoothEndPoint remoteEndPoint, BluetoothPeer peer)
         {
             RemoteEndPoint = remoteEndPoint;
+            this.client = client;
+            this.stream = client.GetStream();
             this.peer = peer;
         }
 
         /// <inheritdoc/>
         protected internal override void Send(byte[] dataBuffer, int amount)
         {
-            peer.Send(dataBuffer, amount);
+            try
+            {
+                if (client.Connected)
+                {
+                    byte[] amountBytes = BitConverter.GetBytes(amount);
+                    stream.Write(amountBytes, 0, sizeof(int));
+                    stream.Write(dataBuffer, 0, amount);
+                }
+            }
+            catch (IOException)
+            {
+                // Handle Bluetooth disconnection or errors
+                peer.OnDisconnected(this, DisconnectReason.TransportError);
+            }
+            catch (ObjectDisposedException)
+            {
+                peer.OnDisconnected(this, DisconnectReason.TransportError);
+            }
+        }
+
+		internal void Poll() {
+			Receive();
+		}
+
+        /// <summary>Polls the stream and checks if any data was received.</summary>
+        internal void Receive()
+        {
+            while (TryReceive(ref nextMessageSize))
+            {
+                peer.OnDataReceived(Peer.ByteBuffer, nextMessageSize, this);
+                nextMessageSize = 0;
+            }
+        }
+
+        private bool TryReceive(ref int nextMessageSize)
+        {
+            try
+            {
+				int bytesRead;
+                if (nextMessageSize == 0 && ((bytesRead = stream.Read(sizeBytes, 0, sizeof(int))) > 0))
+                {
+                    // We have enough bytes for a complete size value
+                    nextMessageSize = BitConverter.ToInt32(sizeBytes, 0);
+                    if (nextMessageSize == 0) return true;
+                }
+                if (nextMessageSize == 0 || ((bytesRead = stream.Read(Peer.ByteBuffer, 0, sizeof(int))) <= 0)) return false;
+                return true;
+            }
+            catch (IOException)
+            {
+                // Handle Bluetooth disconnection or errors
+                peer.OnDisconnected(this, DisconnectReason.TransportError);
+                return false;
+            }
+            catch (ObjectDisposedException)
+            {
+                peer.OnDisconnected(this, DisconnectReason.TransportError);
+                return false;
+            }
+        }
+
+        /// <summary>Closes the connection.</summary>
+        internal void Close()
+        {
+            client.Close();
         }
 
         /// <inheritdoc/>
@@ -40,7 +115,6 @@ namespace Riptide.Transports.Bluetooth
 
         /// <inheritdoc/>
         public override bool Equals(object obj) => Equals(obj as BluetoothConnection);
-
         /// <inheritdoc/>
         public bool Equals(BluetoothConnection other)
         {

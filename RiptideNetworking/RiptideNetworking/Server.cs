@@ -168,8 +168,10 @@ namespace Riptide
 
         /// <summary>Subscribes appropriate methods to the transport's events.</summary>
         private void SubToTransportEvents() {
-			if(transport.t1 != null) SubscribeToTransportEvents(transport.t1);
-			else if(transport.t2 != null) SubscribeToTransportEvents(transport.t2);
+			transport.Match(
+				t1 => SubscribeToTransportEvents(t1),
+				t2 => SubscribeToTransportEvents(t2)
+			);
         }
 
 		private void SubscribeToTransportEvents<T>(IServer<T> transport) {
@@ -180,8 +182,10 @@ namespace Riptide
 
         /// <summary>Unsubscribes methods from all of the transport's events.</summary>
         private void UnsubFromTransportEvents() {
-			if(transport.t1 != null) UnsubscribeFromTransportEvents(transport.t1);
-			else if(transport.t2 != null) UnsubscribeFromTransportEvents(transport.t2);
+			transport.Match(
+				t1 => UnsubscribeFromTransportEvents(t1),
+				t2 => UnsubscribeFromTransportEvents(t2)
+			);
         }
 
 		private void UnsubscribeFromTransportEvents<T>(IServer<T> transport) {
@@ -349,8 +353,10 @@ namespace Riptide
         public override void Update()
         {
             base.Update();
-			transport.t1?.Poll();
-			transport.t2?.Poll();
+			transport.Match(
+				t1 => t1.Poll(),
+				t2 => t2.Poll()
+			);
             HandleMessages();
         }
 
@@ -472,8 +478,10 @@ namespace Riptide
             if (client.Peer != this)
                 return; // Client does not belong to this Server instance
 
-            transport.t1?.Close(client);
-			transport.t2?.Close(client);
+			transport.Match(
+				t1 => t1.Close(client),
+				t2 => t2.Close(client)
+			);
 
             if (clients.Remove(client.Id))
                 availableClientIds.Enqueue(client.Id);
@@ -502,8 +510,10 @@ namespace Riptide
             SendToAll(Message.Create(MessageHeader.Disconnect).AddByte((byte)DisconnectReason.ServerStopped));
             clients.Clear();
 
-            transport.t1?.Shutdown();
-			transport.t2?.Shutdown();
+			transport.Match(
+				t1 => t1.Shutdown(),
+				t2 => t2.Shutdown()
+			);
             UnsubFromTransportEvents();
 
             DecreaseActiveCount();
