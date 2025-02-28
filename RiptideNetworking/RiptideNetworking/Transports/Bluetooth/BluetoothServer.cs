@@ -4,89 +4,106 @@
 // https://github.com/RiptideNetworking/Riptide/blob/main/LICENSE.md
 
 using InTheHand.Net;
+using InTheHand.Net.Bluetooth;
+using InTheHand.Net.Sockets;
+using Riptide.Utils;
 using System;
 using System.Collections.Generic;
 
 namespace Riptide.Transports.Bluetooth
 {
-    /// <summary>A server which can accept connections from <see cref="BluetoothClient"/>s.</summary>
-    public class BluetoothServer : BluetoothPeer, IServer<Guid>
-    {
-        /// <inheritdoc/>
+	/// <inheritdoc/>
+	public class BluetoothServer : BluetoothPeer, IServer
+	{
+		static BluetoothServer listeningServer;
+
+		/// <inheritdoc/>
         public event EventHandler<ConnectedEventArgs> Connected;
-        /// <inheritdoc/>
+		/// <inheritdoc/>
         public event EventHandler<DataReceivedEventArgs> DataReceived;
-
-        /// <summary>The currently open connections, accessible by their endpoints.</summary>
-        private HashSet<BluetoothConnection> connections;
+		private BluetoothListener listener;
+		private HashSet<BluetoothConnection> connections = new HashSet<BluetoothConnection>();
 
 		/// <inheritdoc/>
-        public Guid Port { get; private set; }
+		[Obsolete("BluetoothServer does not have a port.", true)]
+        public ushort Port => throw new Exception("BluetoothServer does not have a port.");
 
-		private BluetoothAddress bluetoothAddress;
-
-        /// <inheritdoc/>
-        public BluetoothServer(BluetoothAddress bluetoothAddress, int socketBufferSize = DefaultSocketBufferSize) : base(socketBufferSize)
-        {
-            connections = new HashSet<BluetoothConnection>();
-			this.bluetoothAddress = bluetoothAddress;
-        }
-
-        /// <inheritdoc/>
-        public void Start(Guid serviceGuid)
-        {
-			Port = serviceGuid;
-            // OpenConnection(bluetoothAddress, serviceGuid);
-        }
-
-        /// <summary>Decides what to do with a connection attempt.</summary>
-        /// <param name="fromConnection">The endpoint the connection attempt is coming from.</param>
-        /// <returns>Whether or not the connection attempt was from a new connection.</returns>
-        private bool HandleConnectionAttempt(BluetoothConnection fromConnection)
-        {
-            if (connections.Contains(fromConnection))
-                return false;
-
-            connections.Add(fromConnection);
-            OnConnected(fromConnection);
-            return true;
+		/// <inheritdoc/>
+		public void Start(ushort port) {
+			if(listeningServer != null) throw new Exception("A local BluetoothServer is already listening!");
+			listeningServer = this;
+			listener = new BluetoothListener(BluetoothService.SerialPort);
+            listener.Start();
+			RiptideLogger.Log(LogType.Info, "Server is waiting for bluetooth connections...");
         }
 
 		/// <inheritdoc/>
-		public void Poll() {
-			foreach (BluetoothConnection connection in connections)
+        public void Close(Connection connection) {
+			if(!(connection is BluetoothConnection btc)) return;
+        	btc.Close();
+			connections.Remove(btc);
+        }
+
+		/// <inheritdoc/>
+        public void Poll() {
+			if(listener == null) return;
+			if(!listener.Active) throw new Exception("BluetoothListener is not active!");
+			BluetoothRadio radio = BluetoothRadio.Default ?? throw new Exception("Bluetooth is not supported on this device.");
+            if(radio.Mode == RadioMode.PowerOff)
+				throw new Exception("Bluetooth is not enabled on this device.");
+			if(listener.Pending()) {
+				InTheHand.Net.Sockets.BluetoothClient newClient = listener.AcceptBluetoothClient();
+				
+				BluetoothConnection newConnection = new BluetoothDeviceConnection(newClient, this);
+				connections.Add(newConnection);
+
+				RiptideLogger.Log(LogType.Info, "New client connected.");
+			}
+
+			foreach(BluetoothConnection connection in connections)
 				connection.Poll();
 		}
 
-        /// <inheritdoc/>
-        public void Close(Connection connection)
-        {
-            if (connection is BluetoothConnection bluetoothConnection)
-                connections.Remove(bluetoothConnection);
+		/// <inheritdoc/>
+        public void Shutdown() {
+			listener.Stop();
+			listeningServer = null;
+			foreach(BluetoothConnection client in connections)
+				client.Close();
+			connections.Clear();
         }
 
-        /// <inheritdoc/>
-        public void Shutdown()
-        {
-            CloseConnection();
-            connections.Clear();
-        }
+		internal static bool GetListeningServer(out BluetoothServer server) {
+			if(listeningServer == null) {
+				server = null;
+				return false;
+			}
+			server = listeningServer;
+			return true;
+		}
 
-        /// <summary>Invokes the <see cref="Connected"/> event.</summary>
-        /// <param name="connection">The successfully established connection.</param>
-        protected virtual void OnConnected(Connection connection)
-        {
-            Connected?.Invoke(this, new ConnectedEventArgs(connection));
-        }
-
-        /// <inheritdoc/>
-        protected internal override void OnDataReceived(byte[] dataBuffer, int amount, BluetoothConnection fromConnection)
-		{
-			if ((MessageHeader)(dataBuffer[0] & Message.HeaderBitmask) == MessageHeader.Connect && !HandleConnectionAttempt(fromConnection))
+		/// <inheritdoc/>
+        protected internal override void OnDataReceived(byte[] dataBuffer, int amount, BluetoothConnection fromConnection) {
+			if((MessageHeader)(dataBuffer[0] & Message.HeaderBitmask) == MessageHeader.Connect && !HandleConnectionAttempt(fromConnection))
                 return;
 
-			if (!fromConnection.IsNotConnected)
-				DataReceived?.Invoke(this, new DataReceivedEventArgs(dataBuffer, amount, fromConnection));
+			if(connections.Contains(fromConnection) && !fromConnection.IsNotConnected)
+                DataReceived?.Invoke(this, new DataReceivedEventArgs(dataBuffer, amount, fromConnection));
+		}
+
+        private bool HandleConnectionAttempt(BluetoothConnection fromConnection) {
+            if(connections.Contains(fromConnection))
+				return false;
+			
+			connections.Add(fromConnection);
+			Connected?.Invoke(this, new ConnectedEventArgs(fromConnection));
+			return true;
+        }
+
+		internal BluetoothSelfConnection AddSelfConnection() {
+			BluetoothSelfConnection selfConnection = new BluetoothSelfConnection(this);
+			connections.Add(selfConnection);
+			return selfConnection;
 		}
     }
 }

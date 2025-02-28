@@ -8,17 +8,17 @@ using System;
 namespace Riptide.Transports
 {
     /// <summary>Defines methods, properties, and events which every transport's server must implement.</summary>
-    public interface IServer<T> : IPeer
+    public interface IServer : IPeer
     {
         /// <summary>Invoked when a connection is established at the transport level.</summary>
         event EventHandler<ConnectedEventArgs> Connected;
 
         /// <inheritdoc cref="Server.Port"/>
-        T Port { get; }
+        ushort Port { get; }
         
         /// <summary>Starts the transport and begins listening for incoming connections.</summary>
         /// <param name="port">The local port on which to listen for connections.</param>
-        void Start(T port);
+        void Start(ushort port);
         
         /// <summary>Closes an active connection.</summary>
         /// <param name="connection">The connection to close.</param>

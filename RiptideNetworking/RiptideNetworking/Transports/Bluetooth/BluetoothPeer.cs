@@ -4,9 +4,6 @@
 // https://github.com/RiptideNetworking/Riptide/blob/main/LICENSE.md
 
 using System;
-using System.Collections.Generic;
-using System.Net.Sockets;
-using InTheHand.Net;
 
 namespace Riptide.Transports.Bluetooth
 {
@@ -20,55 +17,6 @@ namespace Riptide.Transports.Bluetooth
         protected const int DefaultSocketBufferSize = 1024 * 1024; // 1MB
         /// <summary>The minimum size that may be used for the socket's send and receive buffers.</summary>
         private const int MinSocketBufferSize = 256 * 1024; // 256KB
-        /// <summary>How long to wait for a packet, in microseconds.</summary>
-        private const int ReceivePollingTime = 500000; // 0.5 seconds
-
-        /// <summary>The size to use for the socket's send and receive buffers.</summary>
-        private readonly int socketBufferSize;
-        /// <summary>The Bluetooth socket to use for sending and receiving.</summary>
-        private InTheHand.Net.Sockets.BluetoothClient bluetoothClient;
-        /// <summary>The Bluetooth stream for sending and receiving data.</summary>
-        private NetworkStream bluetoothStream;
-        /// <summary>Whether or not the transport is running.</summary>
-        private bool isRunning;
-
-        /// <summary>Initializes the transport.</summary>
-        /// <param name="socketBufferSize">How big the socket's send and receive buffers should be.</param>
-        protected BluetoothPeer(int socketBufferSize)
-        {
-            if (socketBufferSize < MinSocketBufferSize)
-                throw new ArgumentOutOfRangeException(nameof(socketBufferSize), $"The minimum socket buffer size is {MinSocketBufferSize}!");
-
-            this.socketBufferSize = socketBufferSize;
-        }
-
-        /// <summary>Opens the Bluetooth connection and starts the transport.</summary>
-        /// <param name="deviceAddress">The Bluetooth address of the device to connect to.</param>
-        /// <param name="serviceGuid">The GUID of the service to connect to.</param>
-        protected BluetoothConnection OpenConnection(BluetoothAddress deviceAddress, Guid serviceGuid)
-        {
-            if (isRunning)
-                CloseConnection();
-
-            bluetoothClient = new InTheHand.Net.Sockets.BluetoothClient();
-			BluetoothEndPoint remoteEndPoint = new BluetoothEndPoint(deviceAddress, serviceGuid);
-            bluetoothClient.Connect(remoteEndPoint);
-            bluetoothStream = bluetoothClient.GetStream();
-
-            isRunning = true;
-			return new BluetoothConnection(bluetoothClient, remoteEndPoint, this);
-        }
-
-        /// <summary>Closes the Bluetooth connection and stops the transport.</summary>
-        protected void CloseConnection()
-        {
-            if (!isRunning)
-                return;
-
-            isRunning = false;
-            bluetoothStream?.Close();
-            bluetoothClient?.Close();
-        }
 
         /// <summary>Handles received data.</summary>
         /// <param name="dataBuffer">A byte array containing the received data.</param>
