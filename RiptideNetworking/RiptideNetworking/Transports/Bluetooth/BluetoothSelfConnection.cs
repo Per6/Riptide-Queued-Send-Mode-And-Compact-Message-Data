@@ -9,9 +9,9 @@ using System.Collections.Generic;
 
 namespace Riptide.Transports.Bluetooth
 {
-    /// <summary>Represents a connection to a <see cref="BluetoothServer"/> or <see cref="BluetoothClient"/>.</summary>
-    internal class BluetoothSelfConnection : BluetoothConnection
-    {
+	/// <summary>Represents a connection to a <see cref="BluetoothServer"/> or <see cref="BluetoothClient"/>.</summary>
+	internal class BluetoothSelfConnection : BluetoothConnection
+	{
 		private BluetoothSelfConnection bsc;
 		private BluetoothPeer peer;
 		private List<byte[]> pendingMessages = new List<byte[]>();
@@ -21,26 +21,26 @@ namespace Riptide.Transports.Bluetooth
 		}
 
 		/// <inheritdoc/>
-        protected internal override void Send(byte[] dataBuffer, int amount) {
+		protected internal override void Send(byte[] dataBuffer, int amount) {
 			byte[] data = new byte[amount];
 			Array.Copy(dataBuffer, data, amount);
 			bsc.pendingMessages.Add(data);
-        }
+		}
 
-        internal override void Close() {
+		internal override void Close() {
 			bsc = null;
 		}
 
-        internal void Connect(BluetoothServer server) {
+		internal void Connect(BluetoothServer server) {
 			BluetoothSelfConnection c = server.AddSelfConnection();
 			bsc = c;
 			c.bsc = this;
-        }
+		}
 
-        internal override void Poll() {
-            foreach(byte[] data in pendingMessages) {
+		internal override void Poll() {
+			foreach(byte[] data in pendingMessages) {
 				peer.OnDataReceived(data, data.Length, this);
 			}
-        }
-    }
+		}
+	}
 }

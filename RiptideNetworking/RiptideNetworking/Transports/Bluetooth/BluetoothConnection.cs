@@ -5,10 +5,10 @@
 
 namespace Riptide.Transports.Bluetooth
 {
-    /// <summary>Represents a connection to a <see cref="BluetoothServer"/> or <see cref="BluetoothClient"/>.</summary>
-    public abstract class BluetoothConnection : Connection
-    {
-        internal abstract void Close();
-        internal abstract void Poll();
-    }
+	/// <summary>Represents a connection to a <see cref="BluetoothServer"/> or <see cref="BluetoothClient"/>.</summary>
+	public abstract class BluetoothConnection : Connection
+	{
+		internal abstract void Close();
+		internal abstract void Poll();
+	}
 }

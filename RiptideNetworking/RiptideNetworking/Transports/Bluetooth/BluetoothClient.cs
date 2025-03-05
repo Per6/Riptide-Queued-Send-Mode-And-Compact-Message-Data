@@ -15,11 +15,11 @@ namespace Riptide.Transports.Bluetooth
 	public class BluetoothClient : BluetoothPeer, IClient
 	{
 		/// <inheritdoc/>
-        public event EventHandler Connected;
-        /// <inheritdoc/>
-        public event EventHandler ConnectionFailed;
+		public event EventHandler Connected;
 		/// <inheritdoc/>
-        public event EventHandler<DataReceivedEventArgs> DataReceived;
+		public event EventHandler ConnectionFailed;
+		/// <inheritdoc/>
+		public event EventHandler<DataReceivedEventArgs> DataReceived;
 		private BluetoothConnection bluetoothConnection;
 
 		/// <inheritdoc/>
@@ -29,11 +29,11 @@ namespace Riptide.Transports.Bluetooth
 
 		/// <inheritdoc/>
 		public bool Connect(string hostAddress, out Connection connection, out string connectError) {
-            if (!BluetoothAddress.TryParse(hostAddress, out BluetoothAddress serverAddress)) {
+			if (!BluetoothAddress.TryParse(hostAddress, out BluetoothAddress serverAddress)) {
 				connectError = $"Invalid host address '{hostAddress}'! Bluetooth address and service GUID should be separated by a colon, for example: '00:1A:7D:DA:71:13:00001101-0000-1000-8000-00805F9B34FB'.";
-                connection = null;
-                return false;
-            }
+				connection = null;
+				return false;
+			}
 			bluetoothConnection = serverAddress == BluetoothRadio.Default.LocalAddress
 				? (BluetoothConnection)new BluetoothSelfConnection(this)
 				: new BluetoothDeviceConnection(new InTheHand.Net.Sockets.BluetoothClient(), this);
@@ -69,15 +69,15 @@ namespace Riptide.Transports.Bluetooth
 
 		/// <inheritdoc/>
 		protected virtual void OnConnected()
-        {
-            Connected?.Invoke(this, EventArgs.Empty);
-        }
+		{
+			Connected?.Invoke(this, EventArgs.Empty);
+		}
 
 		/// <inheritdoc/>
-        protected virtual void OnConnectionFailed()
-        {
-            ConnectionFailed?.Invoke(this, EventArgs.Empty);
-        }
+		protected virtual void OnConnectionFailed()
+		{
+			ConnectionFailed?.Invoke(this, EventArgs.Empty);
+		}
 
 		/// <inheritdoc/>
 		protected internal override void OnDataReceived(byte[] dataBuffer, int amount, BluetoothConnection fromConnection)

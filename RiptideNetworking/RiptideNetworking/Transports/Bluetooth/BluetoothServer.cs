@@ -18,42 +18,41 @@ namespace Riptide.Transports.Bluetooth
 		static BluetoothServer listeningServer;
 
 		/// <inheritdoc/>
-        public event EventHandler<ConnectedEventArgs> Connected;
+		public event EventHandler<ConnectedEventArgs> Connected;
 		/// <inheritdoc/>
-        public event EventHandler<DataReceivedEventArgs> DataReceived;
+		public event EventHandler<DataReceivedEventArgs> DataReceived;
 		private BluetoothListener listener;
 		private HashSet<BluetoothConnection> connections = new HashSet<BluetoothConnection>();
 
 		/// <inheritdoc/>
 		[Obsolete("BluetoothServer does not have a port.", true)]
-        public ushort Port => throw new Exception("BluetoothServer does not have a port.");
+		public ushort Port => throw new Exception("BluetoothServer does not have a port.");
 
 		/// <inheritdoc/>
 		public void Start(ushort port) {
 			if(listeningServer != null) throw new Exception("A local BluetoothServer is already listening!");
 			listeningServer = this;
 			listener = new BluetoothListener(BluetoothService.SerialPort);
-            listener.Start();
+			listener.Start();
 			RiptideLogger.Log(LogType.Info, "Server is waiting for bluetooth connections...");
-        }
+		}
 
 		/// <inheritdoc/>
-        public void Close(Connection connection) {
+		public void Close(Connection connection) {
 			if(!(connection is BluetoothConnection btc)) return;
-        	btc.Close();
+			btc.Close();
 			connections.Remove(btc);
-        }
+		}
 
 		/// <inheritdoc/>
-        public void Poll() {
+		public void Poll() {
 			if(listener == null) return;
 			if(!listener.Active) throw new Exception("BluetoothListener is not active!");
 			BluetoothRadio radio = BluetoothRadio.Default ?? throw new Exception("Bluetooth is not supported on this device.");
-            if(radio.Mode == RadioMode.PowerOff)
-				throw new Exception("Bluetooth is not enabled on this device.");
+			if(radio.Mode == RadioMode.PowerOff) throw new Exception("Bluetooth is not enabled on this device.");
 			if(listener.Pending()) {
 				InTheHand.Net.Sockets.BluetoothClient newClient = listener.AcceptBluetoothClient();
-				
+
 				BluetoothConnection newConnection = new BluetoothDeviceConnection(newClient, this);
 				connections.Add(newConnection);
 
@@ -65,13 +64,13 @@ namespace Riptide.Transports.Bluetooth
 		}
 
 		/// <inheritdoc/>
-        public void Shutdown() {
+		public void Shutdown() {
 			listener.Stop();
 			listeningServer = null;
 			foreach(BluetoothConnection client in connections)
 				client.Close();
 			connections.Clear();
-        }
+		}
 
 		internal static bool GetListeningServer(out BluetoothServer server) {
 			if(listeningServer == null) {
@@ -83,27 +82,27 @@ namespace Riptide.Transports.Bluetooth
 		}
 
 		/// <inheritdoc/>
-        protected internal override void OnDataReceived(byte[] dataBuffer, int amount, BluetoothConnection fromConnection) {
+		protected internal override void OnDataReceived(byte[] dataBuffer, int amount, BluetoothConnection fromConnection) {
 			if((MessageHeader)(dataBuffer[0] & Message.HeaderBitmask) == MessageHeader.Connect && !HandleConnectionAttempt(fromConnection))
-                return;
+				return;
 
 			if(connections.Contains(fromConnection) && !fromConnection.IsNotConnected)
-                DataReceived?.Invoke(this, new DataReceivedEventArgs(dataBuffer, amount, fromConnection));
+				DataReceived?.Invoke(this, new DataReceivedEventArgs(dataBuffer, amount, fromConnection));
 		}
 
-        private bool HandleConnectionAttempt(BluetoothConnection fromConnection) {
-            if(connections.Contains(fromConnection))
+		private bool HandleConnectionAttempt(BluetoothConnection fromConnection) {
+			if(connections.Contains(fromConnection))
 				return false;
 			
 			connections.Add(fromConnection);
 			Connected?.Invoke(this, new ConnectedEventArgs(fromConnection));
 			return true;
-        }
+		}
 
 		internal BluetoothSelfConnection AddSelfConnection() {
 			BluetoothSelfConnection selfConnection = new BluetoothSelfConnection(this);
 			connections.Add(selfConnection);
 			return selfConnection;
 		}
-    }
+	}
 }
