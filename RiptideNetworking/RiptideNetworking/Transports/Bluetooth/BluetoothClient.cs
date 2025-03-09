@@ -4,10 +4,10 @@
 // https://github.com/RiptideNetworking/Riptide/blob/main/LICENSE.md
 
 using System;
-using System.Linq;
 using InTheHand.Net;
 using InTheHand.Net.Bluetooth;
 using Riptide.Utils;
+using ITH = InTheHand.Net.Sockets;
 
 namespace Riptide.Transports.Bluetooth
 {
@@ -24,7 +24,7 @@ namespace Riptide.Transports.Bluetooth
 
 		/// <inheritdoc/>
 		public void Poll() {
-			bluetoothConnection?.Poll();
+			bluetoothConnection?.Recieve();
 		}
 
 		/// <inheritdoc/>
@@ -36,14 +36,16 @@ namespace Riptide.Transports.Bluetooth
 			}
 			bluetoothConnection = serverAddress == BluetoothRadio.Default.LocalAddress
 				? (BluetoothConnection)new BluetoothSelfConnection(this)
-				: new BluetoothDeviceConnection(new InTheHand.Net.Sockets.BluetoothClient(), this);
+				: new BluetoothDeviceConnection(new ITH.BluetoothClient(), this);
 			try {
 				Connect(serverAddress);
+				OnConnected();
 				RiptideLogger.Log(LogType.Info, "Connected to server.");
 				connection = bluetoothConnection;
 				connectError = "";
 				return true;
 			} catch (Exception e) {
+				OnConnectionFailed();
 				connection = null;
 				connectError = $"Failed to connect to server: {e}";
 				return false;
@@ -82,7 +84,7 @@ namespace Riptide.Transports.Bluetooth
 		/// <inheritdoc/>
 		protected internal override void OnDataReceived(byte[] dataBuffer, int amount, BluetoothConnection fromConnection)
 		{
-			DataReceived?.Invoke(this, new DataReceivedEventArgs(Peer.ByteBuffer, amount, fromConnection));
+			DataReceived?.Invoke(this, new DataReceivedEventArgs(dataBuffer, amount, fromConnection));
 		}
 	}
 

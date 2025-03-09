@@ -146,5 +146,31 @@ namespace Riptide.Utils
         {
             segments[0] |= other;
         }
+
+		/// <summary>
+		/// Checks if all bits up to the given length are set to 1.
+		/// </summary>
+		/// <param name="length">The number of bits to check.</param>
+		/// <returns>True if all bits in the range are set, otherwise false.</returns>
+		internal bool AllSet(int length) {
+			if (length > count)
+				return false;
+
+			int fullSegments = length / SegmentSize;
+			int remainingBits = length % SegmentSize;
+
+			for (int i = 0; i < fullSegments; i++) {
+				if (segments[i] != uint.MaxValue)
+					return false;
+			}
+
+			if (remainingBits > 0) {
+				uint mask = (1U << remainingBits) - 1;
+				if ((segments[fullSegments] & mask) != mask)
+					return false;
+			}
+
+			return true;
+		}
     }
 }

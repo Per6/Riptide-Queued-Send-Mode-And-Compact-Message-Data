@@ -8,13 +8,14 @@ using System.IO;
 using System.Threading.Tasks;
 using InTheHand.Net;
 using InTheHand.Net.Bluetooth;
+using ITH = InTheHand.Net.Sockets;
 
 namespace Riptide.Transports.Bluetooth
 {
 	/// <summary>Represents a connection to a <see cref="BluetoothServer"/> or <see cref="BluetoothClient"/>.</summary>
 	public class BluetoothDeviceConnection : BluetoothConnection
 	{
-		InTheHand.Net.Sockets.BluetoothClient client;
+        ITH.BluetoothClient client;
 		Stream stream;
 		BluetoothPeer peer;
 
@@ -26,11 +27,14 @@ namespace Riptide.Transports.Bluetooth
 		/// <summary>Initializes the connection.</summary>
 		/// <param name="client">The Bluetooth client to use for sending and receiving.</param>
 		/// <param name="peer">The local peer this connection is associated with.</param>
-		internal BluetoothDeviceConnection(InTheHand.Net.Sockets.BluetoothClient client, BluetoothPeer peer)
+		internal BluetoothDeviceConnection(ITH.BluetoothClient client, BluetoothPeer peer)
 		{
 			this.client = client;
 			this.peer = peer;
 		}
+
+		/// <inheritdoc/>
+        public override string ToString() => client.RemoteMachineName;
 
 		internal async void Connect(BluetoothAddress serverAddress) {
 			await Task.Yield();
@@ -62,12 +66,8 @@ namespace Riptide.Transports.Bluetooth
 			}
 		}
 
-		internal override void Poll() {
-			Receive();
-		}
-
 		/// <summary>Polls the stream and checks if any data was received.</summary>
-		internal void Receive()
+		internal override void Recieve()
 		{
 			if(stream == null) return;
 			while (TryReceive(ref nextMessageSize))
@@ -111,9 +111,6 @@ namespace Riptide.Transports.Bluetooth
 			stream.Close();
 			stream.Dispose();
 		}
-
-		/// <inheritdoc/>
-		public override string ToString() => throw new NotImplementedException();
 	}
 
     internal class async

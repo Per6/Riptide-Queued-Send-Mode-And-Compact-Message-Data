@@ -4,6 +4,7 @@
 // https://github.com/RiptideNetworking/Riptide/blob/main/LICENSE.md
 
 using InTheHand.Net;
+using Riptide.Utils;
 using System;
 using System.Collections.Generic;
 
@@ -19,6 +20,9 @@ namespace Riptide.Transports.Bluetooth
 		internal BluetoothSelfConnection(BluetoothPeer peer) {
 			this.peer = peer;
 		}
+
+		/// <inheritdoc/>
+        public override string ToString() => $"SelfConnection";
 
 		/// <inheritdoc/>
 		protected internal override void Send(byte[] dataBuffer, int amount) {
@@ -37,10 +41,11 @@ namespace Riptide.Transports.Bluetooth
 			c.bsc = this;
 		}
 
-		internal override void Poll() {
+		internal override void Recieve() {
 			foreach(byte[] data in pendingMessages) {
 				peer.OnDataReceived(data, data.Length, this);
 			}
+			pendingMessages.Clear();
 		}
 	}
 }

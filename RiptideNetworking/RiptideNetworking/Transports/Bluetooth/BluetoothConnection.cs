@@ -9,6 +9,6 @@ namespace Riptide.Transports.Bluetooth
 	public abstract class BluetoothConnection : Connection
 	{
 		internal abstract void Close();
-		internal abstract void Poll();
+		internal abstract void Recieve();
 	}
 }
