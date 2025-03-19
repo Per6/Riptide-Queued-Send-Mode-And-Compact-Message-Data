@@ -7,6 +7,7 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 
 namespace Riptide.Transports.Tcp
 {
@@ -25,13 +26,11 @@ namespace Riptide.Transports.Tcp
 
         /// <inheritdoc/>
         /// <remarks>Expects the host address to consist of an IP and port, separated by a colon. For example: <c>127.0.0.1:7777</c>.</remarks>
-        public bool Connect(string hostAddress, out Connection connection, out string connectError)
+        public async Task<Either2<Connection, string>> Connect(string hostAddress)
         {
-            connectError = $"Invalid host address '{hostAddress}'! IP and port should be separated by a colon, for example: '127.0.0.1:7777'.";
             if (!ParseHostAddress(hostAddress, out IPAddress ip, out ushort port))
             {
-                connection = null;
-                return false;
+                return $"Invalid host address '{hostAddress}'! IP and port should be separated by a colon, for example: '127.0.0.1:7777'.";
             }
 
             IPEndPoint remoteEndPoint = new IPEndPoint(ip, port);
@@ -53,9 +52,10 @@ namespace Riptide.Transports.Tcp
                 // call OnConnected(), and let Riptide detect that no connection was established.
             }
 
-            connection = tcpConnection = new TcpConnection(socket, remoteEndPoint, this);
+            tcpConnection = new TcpConnection(socket, remoteEndPoint, this);
             OnConnected();
-            return true;
+			await Task.Yield();
+            return tcpConnection;
         }
 
         /// <summary>Parses <paramref name="hostAddress"/> into <paramref name="ip"/> and <paramref name="port"/>, if possible.</summary>

@@ -4,6 +4,7 @@
 // https://github.com/RiptideNetworking/Riptide/blob/main/LICENSE.md
 
 using System;
+using System.Threading.Tasks;
 using InTheHand.Net;
 using InTheHand.Net.Bluetooth;
 using Riptide.Utils;
@@ -22,46 +23,55 @@ namespace Riptide.Transports.Bluetooth
 		public event EventHandler<DataReceivedEventArgs> DataReceived;
 		private BluetoothConnection bluetoothConnection;
 
-		/// <inheritdoc/>
-		public void Poll() {
+        /// <inheritdoc/>
+        public override string ToString() {
+            return $"BluetoothClient {bluetoothConnection?.ToString() ?? "Not connected"}";
+        }
+
+        /// <inheritdoc/>
+        public void Poll() {
 			bluetoothConnection?.Recieve();
 		}
 
 		/// <inheritdoc/>
-		public bool Connect(string hostAddress, out Connection connection, out string connectError) {
-			if (!BluetoothAddress.TryParse(hostAddress, out BluetoothAddress serverAddress)) {
-				connectError = $"Invalid host address '{hostAddress}'! Bluetooth address and service GUID should be separated by a colon, for example: '00:1A:7D:DA:71:13:00001101-0000-1000-8000-00805F9B34FB'.";
-				connection = null;
-				return false;
-			}
-			bluetoothConnection = serverAddress == BluetoothRadio.Default.LocalAddress
+		public async Task<Either2<Connection, string>> Connect(string hostNameAndMaybePin) {
+			ParseNameAndPin(hostNameAndMaybePin, out string serverName, out string serverPin);
+			bluetoothConnection = serverName == BluetoothRadio.Default.Name
 				? (BluetoothConnection)new BluetoothSelfConnection(this)
 				: new BluetoothDeviceConnection(new ITH.BluetoothClient(), this);
 			try {
-				Connect(serverAddress);
-				OnConnected();
-				RiptideLogger.Log(LogType.Info, "Connected to server.");
-				connection = bluetoothConnection;
-				connectError = "";
-				return true;
+				await Connect(serverName, serverPin, OnConnected);
+				return bluetoothConnection;
 			} catch (Exception e) {
 				OnConnectionFailed();
-				connection = null;
-				connectError = $"Failed to connect to server: {e}";
-				return false;
+				return $"Failed to connect to server: {e}";
 			}
 		}
 
-		private void Connect(BluetoothAddress serverAddress) {
+		private async Task Connect(string serverName, string devicePin, Action OnConnected) {
 			switch(bluetoothConnection) {
 				case BluetoothSelfConnection selfConnection:
-					if(BluetoothServer.GetListeningServer(out BluetoothServer server))
+					if(BluetoothServer.GetListeningServer(out BluetoothServer server)) {
 						selfConnection.Connect(server);
+						OnConnected();
+					}
 					break;
 				case BluetoothDeviceConnection deviceConnection:
-					deviceConnection.Connect(serverAddress);
-				break;
+					await deviceConnection.Connect(serverName, devicePin, OnConnected);
+					break;
 			}
+		}
+
+		private void ParseNameAndPin(string hostAddress, out string serverName, out string devicePin) {
+			int lastColon = hostAddress.LastIndexOf(':');
+			if(lastColon == -1) {
+				serverName = hostAddress;
+				devicePin = null;
+				return;
+			}
+			serverName = hostAddress.Substring(0, lastColon);
+			devicePin = hostAddress.Substring(lastColon + 1);
+			return;
 		}
 
 		/// <inheritdoc/>

@@ -4,10 +4,14 @@
 // https://github.com/RiptideNetworking/Riptide/blob/main/LICENSE.md
 
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using InTheHand.Net;
 using InTheHand.Net.Bluetooth;
+using Riptide.Utils;
 using ITH = InTheHand.Net.Sockets;
 
 namespace Riptide.Transports.Bluetooth
@@ -18,9 +22,9 @@ namespace Riptide.Transports.Bluetooth
         ITH.BluetoothClient client;
 		Stream stream;
 		BluetoothPeer peer;
+		private Task<byte[]> pendingData;
+		private CancellationTokenSource cancelPendingData;
 
-		/// <summary>An array to receive message size values into.</summary>
-		private readonly byte[] sizeBytes = new byte[sizeof(int)];
 		/// <summary>The size of the next message to be received.</summary>
 		private int nextMessageSize;
 
@@ -34,12 +38,40 @@ namespace Riptide.Transports.Bluetooth
 		}
 
 		/// <inheritdoc/>
-        public override string ToString() => client.RemoteMachineName;
+        public override string ToString() => client.ToString();
 
-		internal async void Connect(BluetoothAddress serverAddress) {
-			await Task.Yield();
-			client.Connect(serverAddress, BluetoothService.SerialPort);
+		internal void SetStream(ITH.BluetoothClient client) {
 			stream = client.GetStream();
+			if(stream == null) throw new Exception($"Stream is null. Cannot receive data.");
+			StartPendingData();
+		}
+
+		internal async Task Connect(string deviceName, string devicePin, Action OnConnected) {
+			await Task.Run(() => {
+				ITH.BluetoothDeviceInfo device = DiscoverServer(deviceName.ToUpper()) ?? throw new Exception($"Device '{deviceName}' not found.");
+				if(!device.Authenticated) {
+					if(devicePin == null) throw new Exception($"Device '{deviceName}' is not paired. Please pair it first or add a device pin.");
+					BluetoothSecurity.PairRequest(device.DeviceAddress, devicePin);
+				}
+				device.Refresh();
+				client.Connect(device.DeviceAddress, BluetoothService.SerialPort);
+			});
+			SetStream(client);
+			OnConnected();
+		}
+
+		private ITH.BluetoothDeviceInfo DiscoverServer(string deviceName) {
+			ITH.BluetoothDeviceInfo closestDevice = null;
+			List<string> possibleDevices = new List<string>();
+			RiptideLogger.Log(LogType.Info, $"(BLUETOOTH) Searching for device '{deviceName}'...");
+			foreach(ITH.BluetoothDeviceInfo device in client.DiscoverDevices()) {
+				if(device.DeviceName.ToUpper() == deviceName) return device;
+				if(device.DeviceName.ToUpper().Contains(deviceName)) closestDevice = device;
+				possibleDevices.Add(device.DeviceName);
+			}
+			string possibleDevicesString = string.Join(", ", possibleDevices);
+			if(closestDevice == null) throw new Exception($"(BLUETOOTH) Device '{deviceName}' not found. Try one of: [{possibleDevicesString}]");
+			return closestDevice;
 		}
 
 		/// <inheritdoc/>
@@ -66,12 +98,29 @@ namespace Riptide.Transports.Bluetooth
 			}
 		}
 
+		private void StartPendingData() => SetPendingData(sizeof(int));
+		private void SetPendingData(int size) {
+			cancelPendingData = new CancellationTokenSource();
+			pendingData = Task.Run(() => {
+				byte[] data = new byte[size];
+				int offset = 0;
+				while (offset < size) {
+					int read = stream.Read(data, offset, size - offset);
+					if (read == 0)
+						throw new EndOfStreamException();
+					offset += read;
+				}
+				return data;
+			}, cancelPendingData.Token);
+		}
+
 		/// <summary>Polls the stream and checks if any data was received.</summary>
 		internal override void Recieve()
 		{
 			if(stream == null) return;
 			while (TryReceive(ref nextMessageSize))
 			{
+				StartPendingData();
 				peer.OnDataReceived(Peer.ByteBuffer, nextMessageSize, this);
 				nextMessageSize = 0;
 			}
@@ -81,14 +130,14 @@ namespace Riptide.Transports.Bluetooth
 		{
 			try
 			{
-				int bytesRead;
-				if (nextMessageSize == 0 && ((bytesRead = stream.Read(sizeBytes, 0, sizeof(int))) > 0))
-				{
-					// We have enough bytes for a complete size value
-					nextMessageSize = BitConverter.ToInt32(sizeBytes, 0);
-					if (nextMessageSize == 0) return true;
+				if(!pendingData.IsCompleted) return false;
+				if(nextMessageSize == 0) {
+					nextMessageSize = BitConverter.ToInt32(pendingData.Result, 0);
+					if(nextMessageSize == 0) return true;
+					SetPendingData(nextMessageSize);
+					if(!pendingData.IsCompleted) return false;
 				}
-				if (nextMessageSize == 0 || ((bytesRead = stream.Read(Peer.ByteBuffer, 0, sizeof(int))) <= 0)) return false;
+				Array.Copy(pendingData.Result, 0, Peer.ByteBuffer, 0, nextMessageSize);
 				return true;
 			}
 			catch (IOException)
@@ -107,13 +156,10 @@ namespace Riptide.Transports.Bluetooth
 		/// <summary>Closes the connection.</summary>
 		internal override void Close()
 		{
+			cancelPendingData.Cancel();
 			client.Close();
-			stream.Close();
-			stream.Dispose();
+			stream?.Close();
+			stream?.Dispose();
 		}
 	}
-
-    internal class async
-    {
-    }
 }

@@ -48,6 +48,7 @@ namespace Riptide.Transports.Bluetooth
 		}
 
 		private void SetNextPendingClient() {
+			RiptideLogger.Log(LogType.Info, $"BluetoothServer is waiting for a connection...");
 			cancelPendingClient = new CancellationTokenSource();
 			pendingClient = Task.Run(() => listener.AcceptBluetoothClient(), cancelPendingClient.Token);
 		}
@@ -61,8 +62,10 @@ namespace Riptide.Transports.Bluetooth
 			if(pendingClient.IsCompleted) {
                 ITH.BluetoothClient newClient = pendingClient.Result ?? throw new Exception("BluetoothClient is null!");
                 SetNextPendingClient();
+				RiptideLogger.Log(LogType.Info, $"BluetoothServer accepted a connection from {newClient}");
 
-				BluetoothConnection newConnection = new BluetoothDeviceConnection(newClient, this);
+				BluetoothDeviceConnection newConnection = new BluetoothDeviceConnection(newClient, this);
+				newConnection.SetStream(newClient);
 				connections.Add(newConnection);
 				OnConnected(newConnection);
 			}

@@ -8,6 +8,7 @@ using Riptide.Utils;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading.Tasks;
 
 namespace Riptide
 {
@@ -117,18 +118,25 @@ namespace Riptide
         ///   <para>Setting <paramref name="useMessageHandlers"/> to <see langword="false"/> will disable the automatic detection and execution of methods with the <see cref="MessageHandlerAttribute"/>, which is beneficial if you prefer to handle messages via the <see cref="MessageReceived"/> event.</para>
         /// </remarks>
         /// <returns><see langword="true"/> if a connection attempt will be made. <see langword="false"/> if an issue occurred (such as <paramref name="hostAddress"/> being in an invalid format) and a connection attempt will <i>not</i> be made.</returns>
-        public bool Connect(string hostAddress, int maxConnectionAttempts = 5, byte messageHandlerGroupId = 0, Message message = null, bool useMessageHandlers = true)
+        public async Task<bool> Connect(string hostAddress, int maxConnectionAttempts = 5, byte messageHandlerGroupId = 0, Message message = null, bool useMessageHandlers = true)
         {
             Disconnect();
 
             SubToTransportEvents();
 
-            if (!transport.Connect(hostAddress, out connection, out string connectError))
-            {
-                RiptideLogger.Log(LogType.Error, LogName, connectError);
-                UnsubFromTransportEvents();
-                return false;
-            }
+			RiptideLogger.Log(LogType.Info, LogName, $"Establishing Connection to {hostAddress}...");
+
+            if ((await transport.Connect(hostAddress)).Match(
+				con => {
+					connection = con;
+					return false;
+				},
+				err => {
+					RiptideLogger.Log(LogType.Error, LogName, err);
+					UnsubFromTransportEvents();
+					return true;
+				}
+			)) return false;
 
             this.maxConnectionAttempts = maxConnectionAttempts;
             connectionAttempts = 0;

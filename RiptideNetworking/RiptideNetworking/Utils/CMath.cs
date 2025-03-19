@@ -4,12 +4,23 @@
 // https://github.com/RiptideNetworking/Riptide/blob/main/LICENSE.md
 
 
+using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace Riptide.Utils
 {
 	internal static class CMath
 	{
+		internal static T[] ToArray<T>(this IReadOnlyCollection<T> values) {
+			T[] array = new T[values.Count];
+			int i = 0;
+			foreach(T value in values)
+				array[i++] = value;
+			return array;
+		}
+
 		internal static ushort Clamp(this ushort value, ushort min, ushort max) {
 			if(value < min) return min;
 			if(value > max) return max;

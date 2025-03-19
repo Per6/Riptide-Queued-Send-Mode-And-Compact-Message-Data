@@ -4,6 +4,7 @@
 // https://github.com/RiptideNetworking/Riptide/blob/main/LICENSE.md
 
 using System;
+using System.Threading.Tasks;
 
 namespace Riptide.Transports
 {
@@ -17,10 +18,8 @@ namespace Riptide.Transports
 
         /// <summary>Starts the transport and attempts to connect to the given host address.</summary>
         /// <param name="hostAddress">The host address to connect to.</param>
-        /// <param name="connection">The pending connection. <see langword="null"/> if an issue occurred.</param>
-        /// <param name="connectError">The error message associated with the issue that occurred, if any.</param>
         /// <returns><see langword="true"/> if a connection attempt will be made. <see langword="false"/> if an issue occurred (such as <paramref name="hostAddress"/> being in an invalid format) and a connection attempt will <i>not</i> be made.</returns>
-        bool Connect(string hostAddress, out Connection connection, out string connectError);
+        Task<Either2<Connection, string>> Connect(string hostAddress);
 
         /// <summary>Closes the connection to the server.</summary>
         void Disconnect();

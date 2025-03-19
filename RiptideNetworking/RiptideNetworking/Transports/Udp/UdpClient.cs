@@ -7,6 +7,7 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 
 namespace Riptide.Transports.Udp
 {
@@ -28,32 +29,28 @@ namespace Riptide.Transports.Udp
 
         /// <inheritdoc/>
         /// <remarks>Expects the host address to consist of an IP and port, separated by a colon. For example: <c>127.0.0.1:7777</c>.</remarks>
-        public bool Connect(string hostAddress, out Connection connection, out string connectError)
+        public async Task<Either2<Connection, string>> Connect(string hostAddress)
         {
-            connectError = $"Invalid host address '{hostAddress}'! IP and port should be separated by a colon, for example: '127.0.0.1:7777'.";
             if (!ParseHostAddress(hostAddress, out IPAddress ip, out ushort port))
             {
-                connection = null;
-                return false;
+                return $"Invalid host address '{hostAddress}'! IP and port should be separated by a colon, for example: '127.0.0.1:7777'.";
             }
 
             if ((mode == SocketMode.IPv4Only && ip.AddressFamily == AddressFamily.InterNetworkV6) || (mode == SocketMode.IPv6Only && ip.AddressFamily == AddressFamily.InterNetwork))
             {
                 // The IP address isn't in an acceptable format for the current socket mode
                 if (mode == SocketMode.IPv4Only)
-                    connectError = "Connecting to IPv6 addresses is not allowed when running in IPv4 only mode!";
+                    return "Connecting to IPv6 addresses is not allowed when running in IPv4 only mode!";
                 else
-                    connectError = "Connecting to IPv4 addresses is not allowed when running in IPv6 only mode!";
-
-                connection = null;
-                return false;
+                    return "Connecting to IPv4 addresses is not allowed when running in IPv6 only mode!";
             }
 
             OpenSocket();
 
-            connection = udpConnection = new UdpConnection(new IPEndPoint(mode == SocketMode.IPv4Only ? ip : ip.MapToIPv6(), port), this);
+            udpConnection = new UdpConnection(new IPEndPoint(mode == SocketMode.IPv4Only ? ip : ip.MapToIPv6(), port), this);
             OnConnected(); // UDP is connectionless, so from the transport POV everything is immediately ready to send/receive data
-            return true;
+			await Task.Yield();
+            return udpConnection;
         }
 
         /// <summary>Parses <paramref name="hostAddress"/> into <paramref name="ip"/> and <paramref name="port"/>, if possible.</summary>
