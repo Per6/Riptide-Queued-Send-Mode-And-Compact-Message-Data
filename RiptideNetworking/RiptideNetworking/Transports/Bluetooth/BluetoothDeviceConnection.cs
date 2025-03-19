@@ -105,9 +105,9 @@ namespace Riptide.Transports.Bluetooth
 				byte[] data = new byte[size];
 				int offset = 0;
 				while (offset < size) {
+					if (!stream.CanRead) return null;
 					int read = stream.Read(data, offset, size - offset);
-					if (read == 0)
-						throw new EndOfStreamException();
+					if (read == 0) return null;
 					offset += read;
 				}
 				return data;
@@ -126,16 +126,21 @@ namespace Riptide.Transports.Bluetooth
 			}
 		}
 
+		private bool PendingDataHasResult() {
+			if(pendingData.Status != TaskStatus.RanToCompletion) return false;
+			return pendingData.Result != null;
+		}
+
 		private bool TryReceive(ref int nextMessageSize)
 		{
 			try
 			{
-				if(!pendingData.IsCompleted) return false;
+				if(!PendingDataHasResult()) return false;
 				if(nextMessageSize == 0) {
 					nextMessageSize = BitConverter.ToInt32(pendingData.Result, 0);
 					if(nextMessageSize == 0) return true;
 					SetPendingData(nextMessageSize);
-					if(!pendingData.IsCompleted) return false;
+					if(!PendingDataHasResult()) return false;
 				}
 				Array.Copy(pendingData.Result, 0, Peer.ByteBuffer, 0, nextMessageSize);
 				return true;

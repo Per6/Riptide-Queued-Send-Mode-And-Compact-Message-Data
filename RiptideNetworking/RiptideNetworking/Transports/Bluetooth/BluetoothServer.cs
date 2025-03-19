@@ -77,6 +77,7 @@ namespace Riptide.Transports.Bluetooth
 		/// <inheritdoc/>
 		public void Shutdown() {
 			listener.Stop();
+			listener = null;
 			listeningServer = null;
 			if(!pendingClient.IsCompleted) cancelPendingClient.Cancel();
 			foreach(BluetoothConnection client in connections)
