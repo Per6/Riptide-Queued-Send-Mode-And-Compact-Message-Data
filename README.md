@@ -6,9 +6,12 @@
 <div align="center"><a href="https://riptide.tomweiland.net">Docs</a>&emsp;<b>•</b>&emsp;<a href="https://discord.gg/tomweiland">Discord</a>&emsp;<b>•</b>&emsp;<a href="https://github.com/sponsors/tom-weiland">Donate</a></div>
 <h1 align="center">Riptide Networking +CQ</h1>
 
-This is a Fork of Riptide Networking, that adds a queued send mode, which ensures order and reliability of messages. It also adds the ability to easily compact data to
+This is a Fork of Riptide Networking, that adds Bluetooth and a queued send mode, which ensures order and reliability of messages. It also adds the ability to easily compact data to
 log2(possible states) bits instead of riptides best of
 Ceil(log2(possible states)) bits, which was also more complicated to set up.
+
+Bluetooth can be used in unity by including the net462(Windows) folder in your
+project. i have not yet tested any other platform.
 
 Riptide Networking is a lightweight C# networking library primarily designed for use in multiplayer games. It can be used in Unity as well as in other .NET environments such as console applications.
 
