@@ -124,8 +124,6 @@ namespace Riptide
 
             SubToTransportEvents();
 
-			RiptideLogger.Log(LogType.Info, LogName, $"Establishing Connection to {hostAddress}...");
-
             if ((await transport.Connect(hostAddress)).Match(
 				con => {
 					connection = con;

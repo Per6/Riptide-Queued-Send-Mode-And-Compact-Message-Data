@@ -36,10 +36,10 @@ namespace Riptide.Transports.Bluetooth
 		/// <inheritdoc/>
 		public async Task<Either2<Connection, string>> Connect(string hostNameAndMaybePin) {
 			ParseNameAndPin(hostNameAndMaybePin, out string serverName, out string serverPin);
-			bluetoothConnection = serverName == BluetoothRadio.Default.Name
-				? (BluetoothConnection)new BluetoothSelfConnection(this)
-				: new BluetoothDeviceConnection(new ITH.BluetoothClient(), this);
 			try {
+				bluetoothConnection = serverName == BluetoothRadio.Default.Name
+					? (BluetoothConnection)new BluetoothSelfConnection(this)
+					: new BluetoothDeviceConnection(new ITH.BluetoothClient(), this);
 				await Connect(serverName, serverPin, OnConnected);
 				return bluetoothConnection;
 			} catch (Exception e) {

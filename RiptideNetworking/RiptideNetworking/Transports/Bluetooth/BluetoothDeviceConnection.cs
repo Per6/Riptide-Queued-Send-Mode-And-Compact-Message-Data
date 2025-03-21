@@ -47,6 +47,7 @@ namespace Riptide.Transports.Bluetooth
 		}
 
 		internal async Task Connect(string deviceName, string devicePin, Action OnConnected) {
+			RiptideLogger.Log(LogType.Info, $"Establishing Connection to {deviceName}{(devicePin != null ? ":" + devicePin : "")}...");
 			await Task.Run(() => {
 				ITH.BluetoothDeviceInfo device = DiscoverServer(deviceName.ToUpper()) ?? throw new Exception($"Device '{deviceName}' not found.");
 				if(!device.Authenticated) {
