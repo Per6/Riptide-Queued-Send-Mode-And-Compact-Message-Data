@@ -53,6 +53,8 @@ namespace Riptide
 				connection.CanQualityDisconnect = defaultCanQualityDisconnect;
 			}
 		}
+        /// <summary>Wether this client is connecting.</summary>
+        private bool _isConnecting = false;
 		/// <summary>The time untill the client disconnects.</summary>
 		public long TimeUntilDisconnect => connection is null || !connection.CanTimeout
 			? -1
@@ -60,7 +62,7 @@ namespace Riptide
         /// <summary>Whether or not the client is currently <i>not</i> trying to connect, pending, nor actively connected.</summary>
         public bool IsNotConnected => connection is null || connection.IsNotConnected;
         /// <summary>Whether or not the client is currently in the process of connecting.</summary>
-        public bool IsConnecting => !(connection is null) && connection.IsConnecting;
+        public bool IsConnecting => _isConnecting || (!(connection is null) && connection.IsConnecting);
         /// <summary>Whether or not the client's connection is currently pending (waiting to be accepted/rejected by the server).</summary>
         public bool IsPending => !(connection is null) && connection.IsPending;
         /// <summary>Whether or not the client is currently connected.</summary>
@@ -124,6 +126,7 @@ namespace Riptide
 
             SubToTransportEvents();
 
+			_isConnecting = true;
             if ((await transport.Connect(hostAddress)).Match(
 				con => {
 					connection = con;
@@ -134,7 +137,11 @@ namespace Riptide
 					UnsubFromTransportEvents();
 					return true;
 				}
-			)) return false;
+			)) {
+				_isConnecting = false;
+				return false;
+			}
+			_isConnecting = false;
 
             this.maxConnectionAttempts = maxConnectionAttempts;
             connectionAttempts = 0;

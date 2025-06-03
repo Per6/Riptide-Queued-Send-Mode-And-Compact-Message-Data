@@ -43,7 +43,7 @@ namespace Riptide.Transports.Tcp
             
             try
             {
-                socket.Connect(remoteEndPoint); // TODO: do something about the fact that this is a blocking call
+                await Task.Run(() => socket.Connect(remoteEndPoint));
             }
             catch (SocketException)
             {
@@ -54,7 +54,6 @@ namespace Riptide.Transports.Tcp
 
             tcpConnection = new TcpConnection(socket, remoteEndPoint, this);
             OnConnected();
-			await Task.Yield();
             return tcpConnection;
         }
 

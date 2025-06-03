@@ -5,7 +5,6 @@
 
 using System;
 using System.Threading.Tasks;
-using InTheHand.Net;
 using InTheHand.Net.Bluetooth;
 using Riptide.Utils;
 using ITH = InTheHand.Net.Sockets;
@@ -54,11 +53,12 @@ namespace Riptide.Transports.Bluetooth
 					if(BluetoothServer.GetListeningServer(out BluetoothServer server)) {
 						selfConnection.Connect(server);
 						OnConnected();
-					}
-					break;
+						break;
+					} else throw new Exception("No listening server found");
 				case BluetoothDeviceConnection deviceConnection:
 					await deviceConnection.Connect(serverName, devicePin, OnConnected);
 					break;
+				default: throw new Exception("Unknown BluetoothConnection type");
 			}
 		}
 

@@ -6,12 +6,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using InTheHand.Net;
-using InTheHand.Net.Bluetooth;
 using Riptide.Utils;
+using InTheHand.Net.Bluetooth;
 using ITH = InTheHand.Net.Sockets;
 
 namespace Riptide.Transports.Bluetooth

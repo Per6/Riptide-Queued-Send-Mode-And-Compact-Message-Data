@@ -49,7 +49,7 @@ namespace Riptide.Transports.Udp
 
             udpConnection = new UdpConnection(new IPEndPoint(mode == SocketMode.IPv4Only ? ip : ip.MapToIPv6(), port), this);
             OnConnected(); // UDP is connectionless, so from the transport POV everything is immediately ready to send/receive data
-			await Task.Yield();
+			await Task.CompletedTask;
             return udpConnection;
         }
 
