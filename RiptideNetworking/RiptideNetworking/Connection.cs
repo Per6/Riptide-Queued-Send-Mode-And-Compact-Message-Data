@@ -52,6 +52,8 @@ namespace Riptide
         public Action<ushort> NotifyLost;
         /// <summary>Invoked when a notify message is received.</summary>
         public Action<Message> NotifyReceived;
+		/// <summary>Invoked when the queued message with the given ID and SequenceId is successfully delivered.</summary>
+		public Action<ushort, ushort> QueuedDelivered;
         /// <summary>Invoked when the reliable message with the given sequence ID is successfully delivered.</summary>
         public Action<ushort> ReliableDelivered;
 
@@ -65,20 +67,32 @@ namespace Riptide
         public bool IsPending => state == ConnectionState.Pending;
         /// <summary>Whether or not the connection is currently connected.</summary>
         public bool IsConnected => state == ConnectionState.Connected;
-        /// <summary>The round trip time (ping) of the connection, in milliseconds. -1 if not calculated yet.</summary>
+        /// <summary>The round trip time (ping) of the connection, in milliseconds. 1000 if not calculated yet.</summary>
         public short RTT
         {
             get => _rtt;
             private set
             {
-                SmoothRTT = _rtt == -1 ? value : (short)Math.Max(1f, SmoothRTT * 0.7f + value * 0.3f);
+				short rttDif = (short)Math.Abs(SmoothRTT - value);
+				SmoothRTD = (short)Math.Max(1f, (SmoothRTD * 7 + rttDif * 3) / 10);
+                SmoothRTT = (short)Math.Max(1f, (SmoothRTT * 7 + value * 3) / 10);
                 _rtt = value;
             }
         }
-        private short _rtt;
-        /// <summary>The smoothed round trip time (ping) of the connection, in milliseconds. -1 if not calculated yet.</summary>
+        /// <summary>The round trip time jump distance of the connection, in milliseconds. 0 if not calculated yet.</summary>
+		public short RTD => _rtd;
+        private short _rtt = 1000;
+		private short _rtd = 0;
+        /// <summary>The smoothed round trip time (ping) of the connection, in milliseconds. 1000 if not calculated yet.</summary>
         /// <remarks>This value is slower to accurately represent lasting changes in latency than <see cref="RTT"/>, but it is less susceptible to changing drastically due to significant—but temporary—jumps in latency.</remarks>
-        public short SmoothRTT { get; private set; }
+        public short SmoothRTT { get; private set; } = 1000;
+        /// <summary>The smoothed round trip time jumps of the connection, in milliseconds. 0 if not calculated yet.</summary>
+        /// <remarks>This value is slower to accurately represent lasting changes in jumps than <see cref="RTD"/>, but it is less susceptible to changing drastically due to significant—but temporary—jumps in latency.</remarks>
+		public short SmoothRTD { get; private set; } = 0;
+
+        /// <summary>The expected round trip time of the connection, in milliseconds. 1000 if not calculated yet.</summary>
+        /// <remarks>This value like <see cref="SmoothRTT"/> but it also includes some leeway which is expected to appear due to the frequent jumps.</remarks>
+		public short ExpectedRTT => (short)(SmoothRTT + SmoothRTD * 4);
         /// <summary>The time (in milliseconds) after which to disconnect if no heartbeats are received.</summary>
         public int TimeoutTime { get; set; }
         /// <summary>Whether or not the connection can time out.</summary>
@@ -147,8 +161,8 @@ namespace Riptide
             notify = new NotifySequencer(this);
             reliable = new ReliableSequencer(this);
             state = ConnectionState.Connecting;
-            _rtt = -1;
-            SmoothRTT = -1;
+            _rtt = 1000;
+            SmoothRTT = 1000;
             _canTimeout = true;
             CanQualityDisconnect = true;
             MaxAvgSendAttempts = 5;
@@ -405,6 +419,12 @@ namespace Riptide
 		/// <summary>Handles a queued message ack.</summary>
 		/// <param name="message">The ack message to handle.</param>
 		internal void HandleQueuedAck(Message message) {
+			// TODO optimize this by sending messages together and using pending queued bytes
+			// instead. also use rtt and rtd for resend threshold. overlapping bytes
+			// can be ignored and ack can cover a range of bytes bigger than the sent bytes
+			// as well. also add atd to rtt in order to send less stuff twice using
+			// rtt + rtd * 4 as the retry time
+			// also add some congestion management
 			ushort ackedSeqId = message.GetUShort();
 			bool successfull = message.GetBool();
 			ushort listId = (ushort)(ackedSeqId - nextQueuedSequenceId + messageQueue.Count);
@@ -414,6 +434,11 @@ namespace Riptide
 				return;
 			}
 			PendingQueuedMessage qm = messageQueue[listId];
+			if(QueuedDelivered != null) {
+				Message qmd = new Message(qm.data, qm.data.Length, out ulong _, out MessageSendMode _);
+				if(!qmd.Id.HasValue) throw new Exception($"Queued message at listId {listId} has no ID");
+				QueuedDelivered?.Invoke(qmd.Id.Value, qm.SequenceId);
+			}
 			messageQueue[listId] = null;
 			if(qm != null && qm.SequenceId != ackedSeqId) throw new Exception($"Acked sequence ID {ackedSeqId} does not match queued message sequence ID {qm.SequenceId}. Count: {messageQueue.Count}. Next: {nextQueuedSequenceId}. ListId: {listId}");
 			while((messageQueue.Count > 0) && (messageQueue[0] == null)) {
