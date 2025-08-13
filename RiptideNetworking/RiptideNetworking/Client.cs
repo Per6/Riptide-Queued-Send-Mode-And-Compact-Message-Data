@@ -47,8 +47,10 @@ namespace Riptide
             set
             {
                 defaultTimeout = value;
-				if(connection is null) return;
-                connection.TimeoutTime = defaultTimeout;
+                if (connection != null)
+                {
+                    connection.TimeoutTime = defaultTimeout;
+                }
             }
         }
 		/// <summary>Wether the connection gets disconnected when a reliable message takes too long.</summary>

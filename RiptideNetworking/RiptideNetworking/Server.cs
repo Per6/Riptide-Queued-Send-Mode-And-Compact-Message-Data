@@ -277,6 +277,7 @@ namespace Riptide
                     connection.Send(message);
             }
 
+            transport.Close(connection);
             connection.ResetTimeout(); // Keep the connection alive for a moment so the same client can't immediately attempt to connect again
             connection.LocalDisconnect();
 
