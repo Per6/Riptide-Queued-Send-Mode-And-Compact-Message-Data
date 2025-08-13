@@ -11,7 +11,7 @@ log2(possible states) bits instead of riptides best of
 Ceil(log2(possible states)) bits, which was also more complicated to set up.
 
 Bluetooth can be used in unity by including the net462(Windows) folder in your
-project. i have not yet tested any other platform.
+project. Android needs the [UnityAndroid](https://github.com/Per6/UnityAndroid-InTheHand) folder instead.
 
 Riptide Networking is a lightweight C# networking library primarily designed for use in multiplayer games. It can be used in Unity as well as in other .NET environments such as console applications.
 
