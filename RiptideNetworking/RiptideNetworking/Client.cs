@@ -109,6 +109,10 @@ namespace Riptide
         /// <param name="logName">The name to use when logging messages via <see cref="RiptideLogger"/>.</param>
         public Client(string logName = "CLIENT") : this(new Transports.Udp.UdpClient(), logName) { }
 
+		static Client() {
+			System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(Message).TypeHandle);
+		}
+
         /// <summary>Disconnects the client if it's connected and swaps out the transport it's using.</summary>
         /// <param name="newTransport">The new transport to use for sending and receiving data.</param>
         /// <remarks>This method does not automatically reconnect to the server. To continue communicating with the server, <see cref="Connect(string, int, byte, Message, bool)"/> must be called again.</remarks>
