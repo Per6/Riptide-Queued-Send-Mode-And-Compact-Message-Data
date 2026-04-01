@@ -94,6 +94,10 @@ namespace Riptide
         /// <param name="logName">The name to use when logging messages via <see cref="RiptideLogger"/>.</param>
         public Server(string logName = "SERVER") : this(new Transports.Udp.UdpServer(), logName) { }
 
+		static Server() {
+			System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(Message).TypeHandle);
+		}
+
         /// <summary>Stops the server if it's running and swaps out the transport it's using.</summary>
         /// <param name="newTransport">The new underlying transport server to use for sending and receiving data.</param>
         /// <remarks>This method does not automatically restart the server. To continue accepting connections, <see cref="Start(ushort, ushort, byte, bool)"/> must be called again.</remarks>
