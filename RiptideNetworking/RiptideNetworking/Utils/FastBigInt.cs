@@ -33,6 +33,12 @@ namespace Riptide.Utils
 			AdjustMinAndMax();
 		}
 
+		internal void Clear() {
+			Array.Clear(data, 0, data.Length);
+			maxIndex = 0;
+			minIndex = 0;
+		}
+
 		public static explicit operator BigInteger(FastBigInt val) {
 			byte[] bytes = new byte[(val.maxIndex + 1) * sizeof(ulong)];
 			int offset = val.minIndex * 8;

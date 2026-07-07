@@ -252,6 +252,13 @@ namespace Riptide
 			readBit = 0;
 		}
 
+		/// <summary>Resets the message so that it can be reused, thereby avoiding the allocations necessary for creating a new message.</summary>
+		internal void Reuse() {
+			readBit = 0;
+			data.Clear();
+			writeValue.Clear();
+		}
+
 		/// <summary>Creates a QueuedAck message containing sequence ID.</summary>
 		/// <param name="sequenceId">The sequence id to queue.</param>
 		/// <param name="successfull">Whether or not the sequence was successful or needs to be resent.</param>
